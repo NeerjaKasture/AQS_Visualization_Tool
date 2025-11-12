@@ -1,0 +1,23 @@
+# AQS Fair Sensor Deployment Demo Requirements
+# Core Streamlit framework
+streamlit>=1.28.0
+
+# Data manipulation and analysis
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Interactive visualizations
+plotly>=5.15.0
+
+# Optional: Enhanced geographic visualizations
+# geopandas>=0.12.0  # Uncomment if using real shapefiles
+# folium>=0.14.0     # Uncomment for alternative mapping
+
+# Optional: Image processing (for animation export)
+Pillow>=9.0.0      # Uncomment if using animation export features
+# kaleido>=0.2.1     # Uncomment for static plot export
+
+# Development and testing (optional)
+# pytest>=7.0.0      # Uncomment for testing
+# black>=22.0.0      # Uncomment for code formatting
+
