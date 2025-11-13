@@ -88,8 +88,7 @@ def add_variance_heatmap(fig: go.Figure, variance: np.ndarray,
         opacity=opacity,
         showscale=True,
         colorbar=dict(
-            title="Variance",
-            titleside="right"
+            title="Variance"
         ),
         hovertemplate="Lat: %{y:.1f}<br>Lon: %{x:.1f}<br>Variance: %{z:.3f}<extra></extra>"
     ))
