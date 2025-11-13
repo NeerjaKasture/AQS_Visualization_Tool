@@ -150,7 +150,7 @@ def get_k_values() -> List[int]:
 
 def get_methods() -> List[str]:
     """Get available optimization methods."""
-    return ['MaxVar', 'GDMI']
+    return ['maxvar', 'gd']
 
 def validate_data_files() -> Dict[str, bool]:
     """Validate that all required data files exist."""
