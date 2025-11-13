@@ -55,7 +55,7 @@ def render_tab1():
 
     try:
         with st.spinner("Rendering interactive map..."):
-            time.sleep(5)  # simulate loading delay
+            # time.sleep(5)  # simulate loading delay
             fig = create_plotly_india_map(k=int(str(k_sensors).strip()), show_overlay=show_pm25_overlay)
             st.plotly_chart(fig, use_container_width=True)
         st.success("✅ Map loaded successfully!", icon="🌍")
