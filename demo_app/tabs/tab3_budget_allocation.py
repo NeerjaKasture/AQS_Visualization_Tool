@@ -71,7 +71,7 @@ def render_tab3():
 
     allocation_method = st.selectbox(
         "Select Budget Allocation Method",
-        options=["Sarath's Allocation", "Repeat Existing Budget", "Upload Custom CSV"],
+        options=["Guttikunda et al. (2019) Allocation", "Repeat Existing Budget", "Upload Custom CSV"],
         help="Choose how to allocate budget across states"
     )
     st.session_state.allocation_method = allocation_method
@@ -87,10 +87,10 @@ def render_tab3():
  
     # --- Handle allocation methods ---
     allocation_df = None
-    if allocation_method == "Sarath's Allocation":
+    if allocation_method == "Guttikunda et al. (2019) Allocation":
         allocation_df = load_allocation_csv("sarath")
         if not allocation_df.empty:
-            st.success("✅ Loaded Sarath's allocation (filtered by selected states)")
+            st.success("✅ Loaded Guttikunda et al. (2019) allocation ")
             display_allocation_preview(allocation_df)
         # st.write(allocation_df)
         if st.session_state.selected_states:
@@ -173,7 +173,7 @@ def run_budget_optimization() -> None:
         st.success("🎉 Optimization complete! Results are ready below.")
 
 ALLOCATION_COMPARISON_MAP = {
-    "Sarath's Allocation": (os.path.abspath(os.path.join(BASE_DIR, "..", "cache_tab3", "UttarPradeshMadhyaPradeshRajasthancoords", "independent_sarath.csv")),os.path.abspath(os.path.join(BASE_DIR, "..", "cache_tab3", "UttarPradeshMadhyaPradeshRajasthancoords", "blockwise_sarath.csv"))),
+    "Guttikunda et al. (2019) Allocation": (os.path.abspath(os.path.join(BASE_DIR, "..", "cache_tab3", "UttarPradeshMadhyaPradeshRajasthancoords", "independent_sarath.csv")),os.path.abspath(os.path.join(BASE_DIR, "..", "cache_tab3", "UttarPradeshMadhyaPradeshRajasthancoords", "blockwise_sarath.csv"))),
     "Repeat Existing Budget": (os.path.abspath(os.path.join(BASE_DIR, "..", "cache_tab3", "UttarPradeshMadhyaPradeshRajasthancoords", "independent_existing.csv")),os.path.abspath(os.path.join(BASE_DIR, "..", "cache_tab3", "UttarPradeshMadhyaPradeshRajasthancoords", "blockwise_existing.csv"))),
     "Upload Custom CSV": ("custom_run1.csv", "custom_run2.csv"),
 }
