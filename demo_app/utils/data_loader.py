@@ -12,6 +12,8 @@ from typing import Dict, List, Tuple, Any, Optional
 
 # Get the path to demo_data directory
 DATA_DIR = Path(__file__).parent.parent / "demo_data"
+CACHE_DIR = Path(__file__).parent.parent / "cache_tab3"
+
 
 @st.cache_data
 def load_sensor_positions(k: int, method: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -85,7 +87,7 @@ def load_allocation_csv(allocation_type: str) -> pd.DataFrame:
         st.error(f"Unknown allocation type: {allocation_type}")
         return pd.DataFrame()
     
-    allocation_file = DATA_DIR / filename_map[allocation_type]
+    allocation_file = CACHE_DIR / filename_map[allocation_type]
     
     if not allocation_file.exists():
         st.error(f"Allocation file not found: {filename_map[allocation_type]}")
@@ -133,11 +135,14 @@ def load_state_boundaries() -> Dict[str, Dict[str, float]]:
 def get_indian_states() -> List[str]:
     """Get list of Indian states."""
     return [
-        'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-        'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-        'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-        'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
-        'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+           "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+            "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+            "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+            "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan",
+            "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+            "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir",
+            "Ladakh", "Puducherry", "Andaman and Nicobar Islands",
+            "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Lakshadweep"
     ]
 
 def get_fairness_metrics() -> List[str]:
@@ -150,7 +155,7 @@ def get_k_values() -> List[int]:
 
 def get_methods() -> List[str]:
     """Get available optimization methods."""
-    return ['maxvar', 'gd']
+    return ['MaxVar', 'GDMI']
 
 def validate_data_files() -> Dict[str, bool]:
     """Validate that all required data files exist."""

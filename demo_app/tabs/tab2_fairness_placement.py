@@ -30,7 +30,6 @@ def _metric_key(metric: str) -> str:
     return {
         'population': 'population_density',
         'poverty': 'poverty_rate',
-        'gdp': 'gdp_per_capita'
     }[metric]
 
 def render_tab2():
@@ -42,15 +41,14 @@ def render_tab2():
 
     col_controls = st.columns(2)
     with col_controls[0]:
-        selected_state = st.selectbox("Select State", options=states_list, index=states_list.index("Maharashtra") if "Maharashtra" in states_list else 0)
+        selected_state = st.selectbox("Select State", options=states_list, index=states_list.index("Gujarat") if "Gujarat" in states_list else 0)
     with col_controls[1]:
         fairness_metric = st.selectbox(
             "Fairness Metric",
-            options=['population', 'poverty', 'gdp'],
+            options=['population', 'poverty'],
             format_func=lambda x: {
                 'population': 'Population Density',
                 'poverty': 'Poverty Rate',
-                'gdp': 'GDP per Capita'
             }[x]
         )
 

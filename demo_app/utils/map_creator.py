@@ -10,122 +10,199 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import streamlit as st
 from typing import List, Dict, Tuple, Any, Optional
-import xarray as xr
-import json
-import os
-from glob import glob
 
 # India geographic bounds
 INDIA_BOUNDS = {
-    'lat_min': 8, 'lat_max': 37,
-    'lon_min': 68, 'lon_max': 97,
-    'center_lat': 22.5, 'center_lon': 82.5
+    "lat_min": 6.0,
+    "lat_max": 37.5,
+    "lon_min": 68.0,
+    "lon_max": 97.5,
+    "center_lat": 22.0,
+    "center_lon": 79.0,
 }
+import geopandas as gpd
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from pathlib import Path
+import json
+def plot_sensor_choropleth(csv_path, geojson_path, state_shapefile_path):
+    # ------------------------------
+    # Load Data
+    # ------------------------------
+    sensors_df = pd.read_csv(csv_path)
+    districts_gdf = gpd.read_file(geojson_path)
+    states_gdf = gpd.read_file(state_shapefile_path)
+    states_gdf.rename(columns={"State_Name": "stname"}, inplace=True)
 
-@st.cache_data
-def load_sensor_data(results_dir: str = "../../aqs_v2/results/tnpd/default/gd/50/42"):
-    """Load and process sensor data using the simple_plot_best approach."""
-    try:
-        # Find best result JSON
-        files = glob(f"{results_dir}/*.json")
-        
-        if not files:
-            return None, None, None, None
-        
-        def get_loss(file):
-            with open(file, 'r') as f:
-                data = json.load(f)
-            return data['var_loss']
-        
-        files = sorted(files, key=get_loss)
-        best_file = files[0]
-        
-        # Load best result data
-        with open(best_file, 'r') as f:
-            data = json.load(f)
-        
-        # Load scaling parameters
-        scale_path = "../../aqs_v2/data/scale_dict.json"
-        if os.path.exists(scale_path):
-            with open(scale_path) as f:
-                scales = json.load(f)
-        else:
-            return None, None, None, None
-        
-        # Scale x_best coordinates
-        x_new_gd = np.array(data['x_best'])
-        x_new_gd_denorm = x_new_gd.copy()
-        x_new_gd_denorm[:, 0] = x_new_gd[:, 0] * (scales['lat']['max'] - scales['lat']['min']) + scales['lat']['min']
-        x_new_gd_denorm[:, 1] = x_new_gd[:, 1] * (scales['lon']['max'] - scales['lon']['min']) + scales['lon']['min']
-        
-        # Load deployed sensors
-        india_mask_path = "../../aqs_v2/data/india_mask.npz"
-        sensors_mask_path = "../../aqs_v2/data/station_mask.npz"
-        
-        if os.path.exists(india_mask_path) and os.path.exists(sensors_mask_path):
-            india_mask = np.load(india_mask_path)['arr_0']
-            sensors_mask = np.load(sensors_mask_path)['arr_0']
-            deployed_mask = sensors_mask[india_mask]
-            
-            # Load dataset
-            ds_path = "../../aqs_v2/data/val_data.nc"
-            if os.path.exists(ds_path):
-                ds = xr.open_dataset(ds_path)
-                
-                # Simple coordinate extraction (mimicking scale_ds)
-                lat_coords = ds.lat.values
-                lon_coords = ds.lon.values
-                lat_grid, lon_grid = np.meshgrid(lat_coords, lon_coords, indexing='ij')
-                
-                # Create coordinate pairs
-                coords = np.stack([lat_grid.flatten(), lon_grid.flatten()], axis=1)
-                
-                # Apply India mask
-                x = coords[india_mask]
-                
-                # Get deployed sensors
-                x_deployed = x[deployed_mask]
-                x_deployed[:, 0] = x_deployed[:, 0] * (scales['lat']['max'] - scales['lat']['min']) + scales['lat']['min']
-                x_deployed[:, 1] = x_deployed[:, 1] * (scales['lon']['max'] - scales['lon']['min']) + scales['lon']['min']
-                
-                return x_new_gd_denorm, x_deployed, data, ds
-            
-        return None, None, None, None
-        
-    except Exception as e:
-        st.error(f"Error loading sensor data: {e}")
-        return None, None, None, None
+    # Normalize
+    sensors_df.columns = sensors_df.columns.str.lower()
+    districts_gdf.columns = districts_gdf.columns.str.lower()
+    states_gdf.columns = states_gdf.columns.str.lower()
+
+    districts_gdf["stname"] = districts_gdf["stname"].str.strip().str.upper()
+    districts_gdf["dtname"] = districts_gdf["dtname"].str.strip().str.upper()
+
+    sensors_df["stname"] = sensors_df["stname"].str.strip().str.upper()
+    sensors_df["dtname"] = sensors_df["dtname"].str.strip().str.upper()
+
+    # ------------------------------
+    # Count sensors per district
+    # ------------------------------
+    sensor_counts = (
+        sensors_df.groupby(["stname", "dtname"])
+        .size()
+        .reset_index(name="monitors")
+    )
+
+    # ------------------------------
+    # Merge counts into district geojson
+    # ------------------------------
+    merged_gdf = districts_gdf.merge(
+        sensor_counts,
+        on=["stname", "dtname"],
+        how="left"
+    )
+
+    merged_gdf["monitors"] = merged_gdf["monitors"].fillna(0).astype(int)
+
+    # ------------------------------
+    # Filter only states in CSV
+    # ------------------------------
+    selected_states = sorted(list(sensor_counts["stname"].unique()))
+    filtered_gdf = merged_gdf[merged_gdf["stname"].isin(selected_states)]
+
+    filtered_gdf = filtered_gdf.reset_index(drop=True)
+    filtered_gdf["district_id"] = filtered_gdf.index.astype(str)
+
+    # ------------------------------
+    # Compute centroids
+    # ------------------------------
+    india_crs = "EPSG:7755"
+    proj = filtered_gdf.to_crs(india_crs)
+    proj["centroid"] = proj.geometry.centroid
+
+    centroids_ll = proj.set_geometry("centroid").to_crs("EPSG:4326")
+    filtered_gdf["centroid_lon"] = centroids_ll.geometry.x
+    filtered_gdf["centroid_lat"] = centroids_ll.geometry.y
+
+    # ------------------------------
+    # Convert GeoDataFrame to GeoJSON
+    # ------------------------------
+    filtered_geojson = json.loads(filtered_gdf.to_json())
+
+    # Map center
+    minx, miny, maxx, maxy = filtered_gdf.total_bounds
+    center_lat = (miny + maxy) / 2
+    center_lon = (minx + maxx) / 2
+
+    # ------------------------------
+    # Choropleth MAPBOX
+    # ------------------------------
+    fig = px.choropleth_mapbox(
+        filtered_gdf,
+        geojson=filtered_geojson,
+        locations="district_id",
+        featureidkey="properties.district_id",
+        color="monitors",
+        color_continuous_scale="Ice_r",
+        hover_name="dtname",
+        hover_data={"stname": True, "monitors": True, "district_id": False},
+        center={"lat": center_lat, "lon": center_lon},
+        zoom=5.3,
+        opacity=0.6,
+        mapbox_style="carto-positron",
+    )
+
+    # ------------------------------
+    # Add text labels
+    # ------------------------------
+    fig.add_scattermapbox(
+        lon=filtered_gdf["centroid_lon"],
+        lat=filtered_gdf["centroid_lat"],
+        mode="text",
+        text=filtered_gdf["monitors"].astype(str),
+        textfont=dict(size=11, color="black"),
+        hoverinfo="skip",
+        showlegend=False,
+    )
+
+    # ------------------------------
+    # Add thick state borders
+    # ------------------------------
+    states_gdf["stname"] = states_gdf["stname"].str.strip().str.upper()
+    selected_states_gdf = states_gdf[states_gdf["stname"].isin(selected_states)]
+    selected_states_gdf = selected_states_gdf.to_crs("EPSG:4326")
+
+    for _, row in selected_states_gdf.iterrows():
+        geom = row.geometry
+        if geom.geom_type == "Polygon":
+            xs, ys = geom.exterior.xy
+            fig.add_scattermapbox(
+                lon=list(xs),
+                lat=list(ys),
+                mode="lines",
+                line=dict(width=2, color="black"),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        elif geom.geom_type == "MultiPolygon":
+            for poly in geom.geoms:
+                xs, ys = poly.exterior.xy
+                fig.add_scattermapbox(
+                    lon=list(xs),
+                    lat=list(ys),
+                    mode="lines",
+                    line=dict(width=2, color="black"),
+                    hoverinfo="skip",
+                    showlegend=False,
+                )
+
+    fig.update_layout(
+        title=dict(
+            text=f"_",
+            x=0.5,
+            xanchor="center",
+        ),
+        margin=dict(l=0, r=0, t=40, b=0),
+        height=750,
+    )
+
+    return fig
+
 
 def create_base_india_map(height: int = 600, title: str = "") -> go.Figure:
-    """Create a base India map with proper projection and styling."""
+    """Create a base map focused on India with proper zoom, pan, and framing."""
     fig = go.Figure()
-    
+
     fig.update_layout(
         title=dict(
             text=title,
             x=0.5,
-            font=dict(size=16, color='#2E86AB')
+            font=dict(size=16, color="#2E86AB")
         ),
         geo=dict(
-            projection_type='natural earth',
+            projection_type="mercator",
             showland=True,
-            landcolor='rgb(243, 243, 243)',
-            coastlinecolor='rgb(204, 204, 204)',
+            landcolor="rgb(243, 243, 243)",
+            coastlinecolor="rgb(150, 150, 150)",
             showlakes=True,
-            lakecolor='rgb(255, 255, 255)',
-            showsubunits=True,
-            subunitcolor='rgb(217, 217, 217)',
-            countrycolor='rgb(204, 204, 204)',
-            lataxis_range=[INDIA_BOUNDS['lat_min'], INDIA_BOUNDS['lat_max']],
-            lonaxis_range=[INDIA_BOUNDS['lon_min'], INDIA_BOUNDS['lon_max']],
-            center=dict(lat=INDIA_BOUNDS['center_lat'], lon=INDIA_BOUNDS['center_lon']),
-            projection_scale=3
+            lakecolor="rgb(255, 255, 255)",
+            showcountries=True,
+            countrycolor="rgb(150, 150, 150)",
+            lataxis_range=[INDIA_BOUNDS["lat_min"], INDIA_BOUNDS["lat_max"]],
+            lonaxis_range=[INDIA_BOUNDS["lon_min"], INDIA_BOUNDS["lon_max"]],
+            center=dict(lat=INDIA_BOUNDS["center_lat"], lon=INDIA_BOUNDS["center_lon"]),
+            projection_scale=4.5,  # ✅ Adjusted for full-India framing
+            fitbounds="locations",  # ✅ Ensures map fits all points
         ),
         height=height,
-        margin=dict(l=0, r=0, t=40, b=0)
+        margin=dict(l=0, r=0, t=40, b=0),
+        dragmode="pan",  # ✅ Valid value for interactive panning
     )
-    
+
     return fig
+
 
 def add_sensors_to_map(fig: go.Figure, sensors: np.ndarray, name: str = "Sensors", 
                       color: str = 'red', size: int = 4, symbol: str = 'circle') -> go.Figure:
@@ -173,50 +250,23 @@ def add_variance_heatmap(fig: go.Figure, variance: np.ndarray,
     
     return fig
 
-def create_sensor_placement_map(results_dir: str = "../../aqs_v2/results/tnpd/default/gd/50/42",
-                               show_pm25_overlay: bool = True, title: str = "") -> go.Figure:
-    """Create main sensor placement visualization map using real data."""
-    # Load real sensor data
-    optimized_sensors, current_sensors, result_data, ds = load_sensor_data(results_dir)
+def create_sensor_placement_map(current_sensors: np.ndarray, optimized_sensors: np.ndarray,
+                               variance: np.ndarray, lat_grid: np.ndarray, lon_grid: np.ndarray,
+                               show_variance: bool = True, title: str = "") -> go.Figure:
+    """Create main sensor placement visualization map."""
+    fig = create_base_india_map(height=600, title=title)
     
-    if optimized_sensors is None:
-        # Fallback to empty map
-        fig = create_base_india_map(height=600, title="Data not available")
-        return fig
-    
-    fig = create_base_india_map(height=600, title=title or f"Sensor Placement - Loss: {result_data.get('var_loss', 'N/A'):.4f}")
-    
-    # Add PM2.5 heatmap if requested and available
-    if show_pm25_overlay and ds is not None:
-        try:
-            # Use a representative time slice
-            ds_slice = ds.isel(time=13) if 'time' in ds.dims else ds
-            pm25_data = ds_slice['PM25'].values
-            
-            # Create heatmap
-            fig.add_trace(go.Heatmap(
-                z=pm25_data,
-                x=ds.lon.values,
-                y=ds.lat.values,
-                colorscale='Viridis',
-                opacity=0.6,
-                showscale=True,
-                colorbar=dict(
-                    title="PM2.5 (μg/m³)",
-                    x=1.02
-                ),
-                hovertemplate="Lat: %{y:.2f}<br>Lon: %{x:.2f}<br>PM2.5: %{z:.1f} μg/m³<extra></extra>"
-            ))
-        except Exception as e:
-            st.warning(f"Could not add PM2.5 overlay: {e}")
+    # Add variance heatmap if requested
+    if show_variance and len(variance) > 0:
+        fig = add_variance_heatmap(fig, variance, lat_grid, lon_grid)
     
     # Add current sensors
     if len(current_sensors) > 0:
         fig = add_sensors_to_map(
             fig, current_sensors, 
-            name="Current CPCB Sensors", 
-            color='black', 
-            size=4, 
+            name="Current Sensors", 
+            color='red', 
+            size=6, 
             symbol='circle'
         )
     
@@ -225,7 +275,7 @@ def create_sensor_placement_map(results_dir: str = "../../aqs_v2/results/tnpd/de
         fig = add_sensors_to_map(
             fig, optimized_sensors, 
             name="Optimized Sensors", 
-            color='red', 
+            color='blue', 
             size=6, 
             symbol='star'
         )
@@ -272,7 +322,7 @@ def create_choropleth_comparison(district_data: pd.DataFrame,
     )
     
     # Helper function to add choropleth
-    def add_choropleth(col: int, coverage_col: str, title: str):
+    def add_choropleth_mapbox(col: int, coverage_col: str, title: str):
         fig.add_trace(
             go.Choropleth(
                 locations=district_data['district_name'],
@@ -313,100 +363,92 @@ def create_choropleth_comparison(district_data: pd.DataFrame,
     
     return fig
 
-def create_fairness_maps(fairness_data: Dict[str, Dict] = None, selected_state: Optional[str] = None,
+def create_fairness_maps(fairness_data: Dict[str, Dict], selected_state: Optional[str] = None,
                         fairness_metric: str = 'population', show_overlay: bool = True,
-                        show_points: bool = True) -> go.Figure:
-    """Create three maps showing different fairness approaches using real sensor data."""
-    # Load real sensor data for comparison
-    optimized_sensors, current_sensors, result_data, ds = load_sensor_data()
+                        show_points: bool = False) -> go.Figure:
+    """Create three maps showing different fairness approaches."""
+    if not fairness_data:
+        return go.Figure()
     
     # Create subplot with 3 columns
     fig = make_subplots(
         rows=1, cols=3,
-        subplot_titles=["Current CPCB Deployment", "Population Unaware", "Population Aware"],
+        subplot_titles=["Current Biased", "Fairness Blind", "Fairness Aware"],
         specs=[[{"type": "geo"}, {"type": "geo"}, {"type": "geo"}]]
     )
     
-    # Add PM2.5 background if available
-    if show_overlay and ds is not None:
-        try:
-            ds_slice = ds.isel(time=13) if 'time' in ds.dims else ds
-            pm25_data = ds_slice['PM25'].values
-            
-            for col in range(1, 4):
-                fig.add_trace(go.Heatmap(
-                    z=pm25_data,
-                    x=ds.lon.values,
-                    y=ds.lat.values,
+    # Prepare data for choropleth
+    states = list(fairness_data.keys())
+    
+    # Filter by state if selected
+    if selected_state and selected_state != "All States":
+        states = [selected_state] if selected_state in states else []
+    
+    if not states:
+        return fig
+    
+    # Extract metrics
+    metric_map = {
+        'population': 'population_density',
+        'poverty': 'poverty_rate', 
+        'gdp': 'gdp_per_capita'
+    }
+    
+    metric_key = metric_map.get(fairness_metric, 'population_density')
+    metric_values = [fairness_data[state][metric_key] for state in states]
+    
+    # Create mock sensor distributions for visualization
+    np.random.seed(42)  # For reproducible mock data
+    
+    for col, approach in enumerate(['current', 'blind', 'fair'], 1):
+        # Add fairness overlay if requested
+        if show_overlay:
+            fig.add_trace(
+                go.Choropleth(
+                    locations=states,
+                    z=metric_values,
                     colorscale='Viridis',
-                    opacity=0.5,
+                    marker_line_color='darkgray',
+                    marker_line_width=0.5,
+                    opacity=0.7,
                     showscale=(col == 1),
                     colorbar=dict(
-                        title="PM2.5 (μg/m³)" if col == 1 else None,
+                        title=f"{fairness_metric.title()}<br>Density",
                         x=-0.1 if col == 1 else None
                     )
-                ), row=1, col=col)
-        except Exception:
-            pass
-    
-    # Add sensor points if available
-    if show_points:
-        # Column 1: Current CPCB sensors
-        if current_sensors is not None and len(current_sensors) > 0:
-            fig.add_trace(go.Scattergeo(
-                lat=current_sensors[:, 0],
-                lon=current_sensors[:, 1],
-                mode='markers',
-                marker=dict(
-                    size=4,
-                    color='black',
-                    symbol='circle',
-                    line=dict(width=0.5, color='white')
                 ),
-                name="Current CPCB Sensors",
-                showlegend=True,
-                hovertemplate="<b>CPCB Sensor</b><br>Lat: %{lat:.2f}<br>Lon: %{lon:.2f}<extra></extra>"
-            ), row=1, col=1)
+                row=1, col=col
+            )
         
-        # Column 2: Population unaware (random/uniform distribution)
-        np.random.seed(42)
-        n_uniform = len(current_sensors) if current_sensors is not None else 50
-        uniform_lats = np.random.uniform(INDIA_BOUNDS['lat_min'], INDIA_BOUNDS['lat_max'], n_uniform)
-        uniform_lons = np.random.uniform(INDIA_BOUNDS['lon_min'], INDIA_BOUNDS['lon_max'], n_uniform)
-        
-        fig.add_trace(go.Scattergeo(
-            lat=uniform_lats,
-            lon=uniform_lons,
-            mode='markers',
-            marker=dict(
-                size=4,
-                color='blue',
-                symbol='circle',
-                line=dict(width=0.5, color='white')
-            ),
-            name="Uniform Distribution",
-            showlegend=True,
-            hovertemplate="<b>Uniform Sensor</b><br>Lat: %{lat:.2f}<br>Lon: %{lon:.2f}<extra></extra>"
-        ), row=1, col=2)
-        
-        # Column 3: Population aware (optimized sensors)
-        if optimized_sensors is not None and len(optimized_sensors) > 0:
-            fig.add_trace(go.Scattergeo(
-                lat=optimized_sensors[:, 0],
-                lon=optimized_sensors[:, 1],
-                mode='markers',
-                marker=dict(
-                    size=6,
-                    color='red',
-                    symbol='star',
-                    line=dict(width=0.5, color='white')
+        # Add mock sensors if requested
+        if show_points and col in [1, 3]:  # Only for current and fair approaches
+            # Generate mock sensor positions
+            n_sensors = 50 if col == 1 else 100
+            sensor_lats = np.random.uniform(INDIA_BOUNDS['lat_min'], INDIA_BOUNDS['lat_max'], n_sensors)
+            sensor_lons = np.random.uniform(INDIA_BOUNDS['lon_min'], INDIA_BOUNDS['lon_max'], n_sensors)
+            
+            if col == 1:  # Current - clustered near metros
+                # Bias towards major cities
+                sensor_lats = sensor_lats * 0.3 + 0.7 * np.random.choice([28.6, 19.0, 12.9], n_sensors)
+                sensor_lons = sensor_lons * 0.3 + 0.7 * np.random.choice([77.2, 72.8, 77.6], n_sensors)
+            
+            fig.add_trace(
+                go.Scattergeo(
+                    lat=sensor_lats,
+                    lon=sensor_lons,
+                    mode='markers',
+                    marker=dict(
+                        size=4,
+                        color='red' if col == 1 else 'blue',
+                        symbol='circle'
+                    ),
+                    name=f"{'Current' if col == 1 else 'Fair'} Sensors",
+                    showlegend=(col == 1)
                 ),
-                name="Optimized Sensors",
-                showlegend=True,
-                hovertemplate="<b>Optimized Sensor</b><br>Lat: %{lat:.2f}<br>Lon: %{lon:.2f}<extra></extra>"
-            ), row=1, col=3)
+                row=1, col=col
+            )
     
-    # Update geos for all subplots
+    # Update geos
     for col in range(1, 4):
         fig.update_geos(
             lataxis_range=[INDIA_BOUNDS['lat_min'], INDIA_BOUNDS['lat_max']],
@@ -414,20 +456,13 @@ def create_fairness_maps(fairness_data: Dict[str, Dict] = None, selected_state: 
             projection_type='natural earth',
             showland=True,
             landcolor='lightgray',
-            coastlinecolor='darkgray',
             row=1, col=col
         )
     
     fig.update_layout(
         height=500,
-        title_text="Fairness Comparison - Population Aware Sensor Placement",
-        title_x=0.5,
-        legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="left",
-            x=0.01
-        )
+        title_text=f"Fairness Comparison - {fairness_metric.title()} Metric",
+        title_x=0.5
     )
     
     return fig
@@ -505,20 +540,43 @@ def create_interactive_state_selection_map(selected_states: List[str] = None) ->
     
     # Indian states with approximate centroids
     states_data = {
-        'state': ['Maharashtra', 'Uttar Pradesh', 'Karnataka', 'Gujarat', 'Tamil Nadu',
-                 'Rajasthan', 'West Bengal', 'Madhya Pradesh', 'Bihar', 'Andhra Pradesh'],
-        'lat': [19.75, 26.85, 15.32, 23.03, 11.13, 27.02, 22.98, 22.97, 25.10, 15.91],
-        'lon': [75.71, 80.95, 75.71, 72.03, 78.66, 74.22, 87.75, 78.66, 85.31, 79.74],
-        'selected': [state in selected_states for state in ['Maharashtra', 'Uttar Pradesh', 'Karnataka', 'Gujarat', 'Tamil Nadu',
-                    'Rajasthan', 'West Bengal', 'Madhya Pradesh', 'Bihar', 'Andhra Pradesh']]
+       "state": [
+            "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+            "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+            "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+            "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan",
+            "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+            "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir",
+            "Ladakh", "Puducherry", "Andaman and Nicobar Islands",
+            "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Lakshadweep"
+        ],
+        "lat": [
+            15.9, 28.2, 26.2, 25.1, 21.3,
+            15.3, 22.3, 29.1, 31.8, 23.6,
+            15.3, 10.3, 23.5, 19.7, 24.8,
+            25.5, 23.2, 26.1, 20.3, 30.9,
+            26.9, 27.3, 11.1, 17.8, 23.9,
+            26.8, 30.1, 22.9, 28.6, 33.6,
+            34.2, 11.9, 11.6, 30.7, 20.3, 10.6
+        ],
+        "lon": [
+            79.7, 94.7, 92.9, 85.3, 82.0,
+            74.0, 72.5, 76.8, 77.1, 85.3,
+            75.7, 76.3, 78.6, 75.7, 93.9,
+            91.3, 92.7, 94.3, 85.8, 75.4,
+            74.2, 88.5, 78.7, 79.0, 91.6,
+            80.9, 79.0, 87.8, 77.2, 75.1,
+            78.0, 79.8, 92.8, 76.7, 73.0, 72.6
+        ],
     }
     
     df = pd.DataFrame(states_data)
+    df["selected"] = df["state"].isin(selected_states)
     
-    fig = create_base_india_map(height=400, title="Click States to Select/Deselect")
+    fig = create_base_india_map(height=600, title="Click States to Select/Deselect")
     
     # Add state markers
-    colors = ['orange' if selected else 'lightblue' for selected in df['selected']]
+    colors = ['orange' if selected else 'blue' for selected in df['selected']]
     
     fig.add_trace(go.Scattergeo(
         lat=df['lat'],
@@ -526,95 +584,19 @@ def create_interactive_state_selection_map(selected_states: List[str] = None) ->
         mode='markers+text',
         text=df['state'],
         textposition='top center',
+        textfont=dict(
+            family="Arial",
+            size=8,          # smaller font
+            color="black"    # black labels
+        ),
         marker=dict(
-            size=15,
+            size=10,
             color=colors,
             symbol='circle',
-            line=dict(width=2, color='darkblue')
+            line=dict(width=2, color='black')
         ),
         name="States",
-        hovertemplate="<b>%{text}</b><br>" +
-                     "Click to select/deselect<extra></extra>"
+        hoverinfo= "skip"
     ))
     
     return fig
-
-def create_pm25_prediction_map(results_dir: str = "../../aqs_v2/results/tnpd/default/gd/50/42",
-                              show_difference: bool = True, title: str = "") -> go.Figure:
-    """Create PM2.5 prediction map similar to simple_plot_best.py visualization."""
-    # Load sensor data
-    optimized_sensors, current_sensors, result_data, ds = load_sensor_data(results_dir)
-    
-    if ds is None:
-        return create_base_india_map(height=600, title="Data not available")
-    
-    try:
-        # Use time slice 13 like in simple_plot_best.py
-        ds_slice = ds.isel(time=13) if 'time' in ds.dims else ds
-        
-        # Try to generate predictions (simplified version)
-        pm25_data = ds_slice['PM25'].values
-        
-        # For now, create a mock prediction difference
-        # In a full implementation, you would run the model prediction here
-        np.random.seed(42)
-        pred_difference = np.random.normal(0, 5, pm25_data.shape)  # Mock residuals
-        
-        # Create the map
-        fig = create_base_india_map(height=600, title=title or "PM2.5 Predictions vs Ground Truth")
-        
-        if show_difference:
-            # Show prediction difference (residuals)
-            fig.add_trace(go.Heatmap(
-                z=pred_difference,
-                x=ds.lon.values,
-                y=ds.lat.values,
-                colorscale='RdBu_r',
-                opacity=0.8,
-                showscale=True,
-                colorbar=dict(
-                    title="PM2.5 Residuals<br>(μg/m³)",
-                    x=1.02
-                ),
-                hovertemplate="Lat: %{y:.2f}<br>Lon: %{x:.2f}<br>Residual: %{z:.1f} μg/m³<extra></extra>"
-            ))
-        else:
-            # Show actual PM2.5 values
-            fig.add_trace(go.Heatmap(
-                z=pm25_data,
-                x=ds.lon.values,
-                y=ds.lat.values,
-                colorscale='Viridis',
-                opacity=0.8,
-                showscale=True,
-                colorbar=dict(
-                    title="PM2.5 (μg/m³)",
-                    x=1.02
-                ),
-                hovertemplate="Lat: %{y:.2f}<br>Lon: %{x:.2f}<br>PM2.5: %{z:.1f} μg/m³<extra></extra>"
-            ))
-        
-        # Add sensors
-        if current_sensors is not None and len(current_sensors) > 0:
-            fig = add_sensors_to_map(
-                fig, current_sensors,
-                name="CPCB Sensors",
-                color='black',
-                size=4,
-                symbol='circle'
-            )
-        
-        if optimized_sensors is not None and len(optimized_sensors) > 0:
-            fig = add_sensors_to_map(
-                fig, optimized_sensors,
-                name="Optimized Sensors",
-                color='red',
-                size=6,
-                symbol='star'
-            )
-        
-        return fig
-        
-    except Exception as e:
-        st.error(f"Error creating PM2.5 prediction map: {e}")
-        return create_base_india_map(height=600, title="Error loading PM2.5 data")

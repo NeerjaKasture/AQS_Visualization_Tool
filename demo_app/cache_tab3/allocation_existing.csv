@@ -1,0 +1,38 @@
+state_name,required_sensors
+Andaman & Nicobar,0
+Chandigarh,1
+Daman and Diu,0
+Dadra and Nagar Haveli,0
+Delhi,12
+Haryana,26
+Jharkhand,4
+Karnataka,32
+Kerala,6
+Lakshadweep,0
+Madhya Pradesh,21
+Maharashtra,43
+Odisha,16
+Puducherry,0
+Tamilnadu,32
+Chhattishgarh,13
+Telengana,10
+Andhra Pradesh,10
+Goa,0
+Himachal Pradesh,1
+Punjab,8
+Rajasthan,39
+Gujarat,12
+Uttarakhand,3
+Uttar Pradesh,33
+Sikkim,1
+Assam,7
+Arunachal Pradesh,1
+Nagaland,1
+Manipur,2
+Mizoram,1
+Tripura,1
+Meghalaya,2
+West Bengal,12
+Bihar,27
+Ladakh,0
+Jammu and Kashmir,1
