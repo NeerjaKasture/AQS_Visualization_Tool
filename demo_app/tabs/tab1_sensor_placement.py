@@ -141,15 +141,20 @@ def render_tab1():
             st.caption(f"📄 Showing: {csv_path.name}")
             st.dataframe(df_preview.head(50), use_container_width=True, height=300)
 
-            # --- Download button ---
-            with open(csv_path, "rb") as f:
-                st.download_button(
-                    label="⬇️ Download CSV",
-                    data=f.read(),
-                    file_name=csv_path.name,
-                    mime="text/csv",
-                    key=f"download_best_sensors_{n_val}"
-                )
+            from utils.kml_exporter import dataframe_to_kml
+
+            # Generate KML string
+            kml_string = dataframe_to_kml(df_preview, lon_col="longitude", lat_col="latitude")
+
+            # KML download button
+            st.download_button(
+                label="🌐 Download KML (Google Earth)",
+                data=kml_string.encode("utf-8"),
+                file_name=f"best_sensors_{n_val}.kml",
+                mime="application/vnd.google-earth.kml+xml",
+                key=f"download_best_sensors_kml_{n_val}"
+            )
+
 
     
     # # Summary section
