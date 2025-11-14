@@ -243,13 +243,6 @@ def render_main_header():
     </div>
     """, unsafe_allow_html=True)
 
-def render_sidebar():
-    """Deprecated: Sidebar removed for a clean, academic look."""
-    return
-
-def check_data_availability():
-    """Deprecated: Data availability checks removed."""
-    return True
 
 def main():
     """Main application entry point."""
