@@ -18,9 +18,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.tab1_utils import (
     create_plotly_india_map
 )
-from utils.animation_handler import animate_sensor_movement
-from utils.data_loader import load_trajectory, load_metrics_history, load_variance_heatmap
-# Animation features removed for simplicity
 
 def render_tab1():
     """Render the AQ Sensor Placement Visualization tab."""
@@ -143,8 +140,11 @@ def render_tab1():
         if not anim_dir.exists():
             st.warning(f"Animations directory not found: {anim_dir}")
         else:
-            # Find best matching animation file (GIF or video)
-            pattern = f"prediction_error_n{k_val}.*"
+            # Find best matching animation file 
+            if method_key == "MaxVar":
+                pattern = f"prediction_error_maxvar_n{k_val}.gif"
+            else:
+                pattern = f"prediction_error_n{k_val}.gif"
             candidates = list(anim_dir.glob(pattern))
 
             # Fallback: show most recent animation if none match k
