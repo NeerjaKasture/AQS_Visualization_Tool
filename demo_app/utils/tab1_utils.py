@@ -14,25 +14,30 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_BASE = os.path.join(BASE_DIR, "../cache/vis_data")
 DATA_BASE = os.path.abspath(DATA_BASE)  
 
-def _load_visualization_data(k) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
-    x_new_gd = np.load(f"{DATA_BASE}/x_new_gd_n{k}.npy")
+def _load_visualization_data(k, method="GDMI") -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
+    if method == "MaxVar":
+        x_new = np.load(f"{DATA_BASE}/x_new_var_n{k}.npy")
+        pm25_pred = np.load(f"{DATA_BASE}/pm25_pred_var_n{k}.npy")
+    else:
+        x_new = np.load(f"{DATA_BASE}/x_new_gd_n{k}.npy")
+        pm25_pred = np.load(f"{DATA_BASE}/pm25_pred_n{k}.npy")
     x_deployed = np.load(f"{DATA_BASE}/x_deployed.npy")
-    pm25_pred = np.load(f"{DATA_BASE}/pm25_pred_n{k}.npy")
     pm25_true = np.load(f"{DATA_BASE}/pm25_true_n{k}.npy")
     var = pm25_pred - pm25_true
     india_mask = np.load(f"{DATA_BASE}/india_mask.npy")
-    return x_new_gd, x_deployed, pm25_pred, pm25_true,var, india_mask
+    return x_new, x_deployed, pm25_pred, pm25_true, var, india_mask
 
 
 def create_plotly_india_map(
     k: int,
+    method: str = "GDMI",
     show_overlay: bool = True,
     colorscale: str = "RdYlBu_r",
     overlay_opacity: float = 0.7,
 ) -> go.Figure:
 
     # Load predicted/true + sensors + mask
-    x_new_gd, x_deployed, pm25_pred, pm25_true, _, india_mask = _load_visualization_data(k)
+    x_new_gd, x_deployed, pm25_pred, pm25_true, _, india_mask = _load_visualization_data(k, method=method)
 
     # # Load India shapefile for border
     # gdf = gpd.read_file(os.path.join(BASE_DIR, "../cache/shapefiles/India_Country_Boundary.shp"))
@@ -133,7 +138,7 @@ def create_plotly_india_map(
 
     # === Layout ===
     fig.update_layout(
-        title=f"India Sensor Map (k={k})",
+        title=f"India Sensor Map (k={k}, method={method})",
         xaxis=dict(title="Longitude", range=[lon_min, lon_max], constrain="domain"),
         yaxis=dict(title="Latitude", range=[lat_min, lat_max], scaleanchor="x", scaleratio=1),
         height=650,

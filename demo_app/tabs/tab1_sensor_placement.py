@@ -6,6 +6,7 @@ Implements interactive sensor placement with animation and comparison maps.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import json
 import time
 
 # Import utilities
@@ -34,7 +35,7 @@ def render_tab1():
     with col1:
         k_sensors = st.selectbox(
             "Sensor Configuration",
-            options=["20","50", "100", "500"],
+            options=["20","40", "100", "500"],
             index=0,
         )
     
@@ -53,14 +54,69 @@ def render_tab1():
     with col[0]:
         show_pm25_overlay = st.checkbox("Show Overlay", value=True)
 
+    # Resolve method key
+    method_key = "MaxVar" if "MaxVar" in method else "GDMI"
+
     try:
         with st.spinner("Rendering interactive map..."):
             # time.sleep(5)  # simulate loading delay
-            fig = create_plotly_india_map(k=int(str(k_sensors).strip()), show_overlay=show_pm25_overlay)
+            fig = create_plotly_india_map(k=int(str(k_sensors).strip()), method=method_key, show_overlay=show_pm25_overlay)
             st.plotly_chart(fig, use_container_width=True)
         st.success("✅ Map loaded successfully!", icon="🌍")
     except Exception as e:
         st.warning(f"⚠️ Could not render Plotly map: {e}")
+
+    # --- Optimization Statistics Section ---
+    st.divider()
+    st.subheader("📊 Metrics")
+
+    summary_path = Path(__file__).resolve().parent / "../cache/vis_data/summary.json"
+    try:
+        with open(summary_path, "r") as f:
+            summary_data = json.load(f)
+
+        # Pick the right section
+        section_key = "maxvar" if method_key == "MaxVar" else "gdmi"
+        k_str = str(int(str(k_sensors).strip()))
+        stats = summary_data.get(section_key, {}).get(k_str)
+
+        if stats is None:
+            st.info(f"No statistics available for {method_key} with k={k_str}.")
+        else:
+            rmse_before = stats.get("rmse_before")
+            rmse_after = stats.get("rmse_after")
+            improvement_pct = stats.get("improvement_percent")
+            pred_rmse = stats.get("pred_rmse")
+            final_loss = stats.get("best_loss") or stats.get("final_loss")
+
+            # Metric cards row
+            m1, m2 = st.columns(2)
+            m1.metric(
+                label="RMSE (Existing Sensors)",
+                value=f"{rmse_before:.3f} " if rmse_before is not None else "—",
+            )
+            m2.metric(
+                label="RMSE (Post Deployment)",
+                value=f"{rmse_after:.3f} " if rmse_after is not None else "—",
+                delta=f"-{improvement_pct:.2f}%" if improvement_pct else None,
+                delta_color="inverse",
+            )
+            
+
+            m4, m5 = st.columns(2)
+            m4.metric(
+                label="Final Predictive RMSE",
+                value=f"{pred_rmse:.3f} μg/m³" if pred_rmse is not None else "—",
+            )
+            m5.metric(
+                label="Final Optimization Loss",
+                value=f"{final_loss:.6f}" if final_loss is not None else "—",
+            )
+
+    except FileNotFoundError:
+        st.warning("Summary statistics file not found.")
+    except Exception as e:
+        st.warning(f"Could not load statistics: {e}")
 
     
     # Animation section
@@ -127,11 +183,15 @@ def render_tab1():
     if not cache_dir.exists():
         st.warning(f"Cache directory not found: {cache_dir}")
     else:
-        # --- Find matching CSV(s) ---
-        candidates = list(cache_dir.glob(f"best_sensors_{n_val}*.csv"))
+        # --- Find matching CSV(s) based on method ---
+        if method_key == "MaxVar":
+            candidates = list(cache_dir.glob(f"best_sensors_var_{n_val}*.csv"))
+        else:
+            candidates = list(cache_dir.glob(f"best_sensors_{n_val}*.csv"))
 
         if not candidates:
-            st.info(f"No CSV found in {cache_dir} for n={n_val} (expected: best_sensors_{n_val}.csv)")
+            csv_prefix = f"best_sensors_var_{n_val}" if method_key == "MaxVar" else f"best_sensors_{n_val}"
+            st.info(f"No CSV found in {cache_dir} for n={n_val}, method={method_key} (expected: {csv_prefix}.csv)")
         else:
             # Pick most recently modified file
             csv_path = sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)[0]
@@ -147,12 +207,13 @@ def render_tab1():
             kml_string = dataframe_to_kml(df_preview, lon_col="longitude", lat_col="latitude")
 
             # KML download button
+            kml_filename = f"best_sensors_var_{n_val}.kml" if method_key == "MaxVar" else f"best_sensors_{n_val}.kml"
             st.download_button(
                 label="🌐 Download KML (Google Earth)",
                 data=kml_string.encode("utf-8"),
-                file_name=f"best_sensors_{n_val}.kml",
+                file_name=kml_filename,
                 mime="application/vnd.google-earth.kml+xml",
-                key=f"download_best_sensors_kml_{n_val}"
+                key=f"download_best_sensors_kml_{n_val}_{method_key}"
             )
 
 

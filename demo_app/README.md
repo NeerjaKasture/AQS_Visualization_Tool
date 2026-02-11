@@ -22,12 +22,8 @@ This interactive Streamlit demo showcases fair air quality sensor deployment opt
    pip install -r requirements.txt
    ```
 
-3. **Generate dummy data:**
-   ```bash
-   python generate_dummy_data.py
-   ```
 
-4. **Launch the demo:**
+3. **Launch the demo:**
    ```bash
    streamlit run demo_app.py
    ```
