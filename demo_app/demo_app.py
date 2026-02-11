@@ -18,7 +18,7 @@ from tabs import render_tab1, render_tab2, render_tab3
 
 # Page configuration
 st.set_page_config(
-    page_title="AQS Fair Sensor Deployment Demo",
+    page_title="Air Quality Sensor Deployment Demo",
     page_icon="🌍",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -238,8 +238,8 @@ def render_main_header():
     """Render the main application header with Indian flag colors."""
     st.markdown("""
     <div class="main-header">
-        <h1 class="main-title"> AQ Sensor Deployment Demo</h1>
-        <p class="main-subtitle"> Air Quality Sensor Optimization for India</p>
+        <h1 class="main-title"> Air Quality Sensor Deployment Demo</h1>
+        <p class="main-subtitle"> AQ Sensor Placement Optimization for India</p>
     </div>
     """, unsafe_allow_html=True)
 

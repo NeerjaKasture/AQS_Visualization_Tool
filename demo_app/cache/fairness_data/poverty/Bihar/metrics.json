@@ -1,0 +1,25 @@
+{
+  "state": "Bihar",
+  "n_new": 50,
+  "n_iters": 50,
+  "lr": 0.01,
+  "seed": 49,
+  "n_initial_sensors": 27,
+  "n_state_locations": 849,
+  "baseline": {
+    "rmse": 10.773332595825195,
+    "pop_rmse": 9.728135108947754
+  },
+  "normal_gdmi": {
+    "n_total_sensors": 77,
+    "n_new_sensors": 23,
+    "rmse": 7.482264995574951,
+    "pop_rmse": 7.056279182434082
+  },
+  "pop_weighted_gdmi": {
+    "n_total_sensors": 77,
+    "n_new_sensors": 27,
+    "rmse": 7.382776260375977,
+    "pop_rmse": 7.005312919616699
+  }
+}

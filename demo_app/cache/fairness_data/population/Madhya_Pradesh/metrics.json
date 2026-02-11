@@ -1,0 +1,25 @@
+{
+  "state": "Madhya Pradesh",
+  "n_new": 50,
+  "n_iters": 50,
+  "lr": 0.01,
+  "seed": 49,
+  "n_initial_sensors": 21,
+  "n_state_locations": 2726,
+  "baseline": {
+    "rmse": 7.402543067932129,
+    "pop_rmse": 6.584427833557129
+  },
+  "normal_gdmi": {
+    "n_total_sensors": 71,
+    "n_new_sensors": 49,
+    "rmse": 4.127516746520996,
+    "pop_rmse": 3.734396457672119
+  },
+  "pop_weighted_gdmi": {
+    "n_total_sensors": 71,
+    "n_new_sensors": 49,
+    "rmse": 4.130795001983643,
+    "pop_rmse": 3.703671455383301
+  }
+}
