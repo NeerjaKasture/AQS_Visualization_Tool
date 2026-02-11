@@ -1,0 +1,25 @@
+{
+  "state": "Gujarat",
+  "n_new": 50,
+  "n_iters": 50,
+  "lr": 0.01,
+  "seed": 69,
+  "n_initial_sensors": 12,
+  "n_state_locations": 1607,
+  "baseline": {
+    "rmse": 12.265884399414062,
+    "pop_rmse": 8.97152328491211
+  },
+  "normal_gdmi": {
+    "n_total_sensors": 62,
+    "n_new_sensors": 41,
+    "rmse": 5.364202976226807,
+    "pop_rmse": 4.46129035949707
+  },
+  "pop_weighted_gdmi": {
+    "n_total_sensors": 62,
+    "n_new_sensors": 45,
+    "rmse": 6.093388557434082,
+    "pop_rmse": 4.689515113830566
+  }
+}

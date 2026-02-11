@@ -1,0 +1,25 @@
+{
+  "state": "Punjab",
+  "n_new": 50,
+  "n_iters": 50,
+  "lr": 0.01,
+  "seed": 42,
+  "n_initial_sensors": 8,
+  "n_state_locations": 473,
+  "baseline": {
+    "rmse": 10.202778816223145,
+    "pop_rmse": 9.737541198730469
+  },
+  "normal_gdmi": {
+    "n_total_sensors": 58,
+    "n_new_sensors": 36,
+    "rmse": 6.640923500061035,
+    "pop_rmse": 6.3170166015625
+  },
+  "pop_weighted_gdmi": {
+    "n_total_sensors": 58,
+    "n_new_sensors": 39,
+    "rmse": 6.571396827697754,
+    "pop_rmse": 6.242577075958252
+  }
+}

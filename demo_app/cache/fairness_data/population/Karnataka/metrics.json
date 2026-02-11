@@ -1,0 +1,25 @@
+{
+  "state": "Karnataka",
+  "n_new": 50,
+  "n_iters": 50,
+  "lr": 0.01,
+  "seed": 42,
+  "n_initial_sensors": 32,
+  "n_state_locations": 1609,
+  "baseline": {
+    "rmse": 3.1109466552734375,
+    "pop_rmse": 2.7181777954101562
+  },
+  "normal_gdmi": {
+    "n_total_sensors": 76,
+    "n_new_sensors": 39,
+    "rmse": 2.6717183589935303,
+    "pop_rmse": 2.4461326599121094
+  },
+  "pop_weighted_gdmi": {
+    "n_total_sensors": 76,
+    "n_new_sensors": 40,
+    "rmse": 2.6621038913726807,
+    "pop_rmse": 2.354480266571045
+  }
+}

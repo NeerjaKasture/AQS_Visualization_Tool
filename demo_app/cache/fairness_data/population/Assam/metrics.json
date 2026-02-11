@@ -1,0 +1,25 @@
+{
+  "state": "Assam",
+  "n_new": 50,
+  "n_iters": 50,
+  "lr": 0.01,
+  "seed": 42,
+  "n_initial_sensors": 7,
+  "n_state_locations": 718,
+  "baseline": {
+    "rmse": 11.916259765625,
+    "pop_rmse": 8.90640640258789
+  },
+  "normal_gdmi": {
+    "n_total_sensors": 57,
+    "n_new_sensors": 47,
+    "rmse": 7.075932502746582,
+    "pop_rmse": 6.381739616394043
+  },
+  "pop_weighted_gdmi": {
+    "n_total_sensors": 57,
+    "n_new_sensors": 47,
+    "rmse": 7.070516109466553,
+    "pop_rmse": 6.212682723999023
+  }
+}
