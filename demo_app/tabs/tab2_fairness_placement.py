@@ -12,6 +12,7 @@ built from cached artefacts in ``cache/fairness_data/<State_Name>/``.
 import streamlit as st
 from pathlib import Path
 import sys
+import time
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -51,6 +52,13 @@ def render_tab2():
     if not has_cached_data(selected_state, fairness_metric):
         st.warning(f"No cached data for **{selected_state}** / **{fairness_metric}**. Run the pipeline first.")
         return
+
+    # Detect selection change and show loading delay
+    _tab2_key = f"{selected_state}_{fairness_metric}"
+    if st.session_state.get("_tab2_prev_key") != _tab2_key:
+        st.session_state["_tab2_prev_key"] = _tab2_key
+        with st.spinner("⏳ Deploying new configuration..."):
+            time.sleep(5)
 
     st.divider()
 

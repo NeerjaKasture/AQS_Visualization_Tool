@@ -43,6 +43,13 @@ def render_tab1():
             index=0,
         )
     
+    # Detect selection change and show loading delay
+    _tab1_key = f"{k_sensors}_{method}"
+    if st.session_state.get("_tab1_prev_key") != _tab1_key:
+        st.session_state["_tab1_prev_key"] = _tab1_key
+        with st.spinner("⏳ Deploying new configuration..."):
+            time.sleep(5)
+
     # Main visualization section
     st.header("📍 Sensor Deployment Map")
     
