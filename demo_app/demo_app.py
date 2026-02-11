@@ -254,12 +254,15 @@ def main():
     
     # Main content area with tabs
     
-    tab1, tab2, tab3 = st.tabs([
+    # tab1, tab2, tab3 = st.tabs([
+    #     "🌍 Sensor Placement Visualization",
+    #     "⚖️ Fairness Aware Placement", 
+    #     "💰 Budget Constrained Allocation"
+    # ])
+    tab1, tab2 = st.tabs([
         "🌍 Sensor Placement Visualization",
         "⚖️ Fairness Aware Placement", 
-        "💰 Budget Constrained Allocation"
     ])
-    
     # Render tab content with error handling
     with tab1:
         try:
@@ -275,12 +278,12 @@ def main():
             st.error(f"Error in Tab 2: {str(e)}")
             st.write("Please check the data files and try again.")
     
-    with tab3:
-        try:
-            render_tab3()
-        except Exception as e:
-            st.error(f"Error in Tab 3: {str(e)}")
-            st.write("Please check the data files and try again.")
+    # with tab3:
+    #     try:
+    #         render_tab3()
+    #     except Exception as e:
+    #         st.error(f"Error in Tab 3: {str(e)}")
+    #         st.write("Please check the data files and try again.")
     
     # Footer
     st.markdown("---")
