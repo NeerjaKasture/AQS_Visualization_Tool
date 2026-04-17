@@ -280,8 +280,11 @@ from importlib.machinery import SourceFileLoader
 # CONFIG
 # -----------------------------
 
-DEVICE =  "cuda" if torch.cuda.is_available() else "cpu"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+st.write(f"Using device: {DEVICE}")
 
 def snap_to_grid(x_norm, x_all_norm, coords):
     """
@@ -298,38 +301,50 @@ import imageio.v2 as imageio
 import tempfile
 
 @st.cache_data(show_spinner=False)
-def create_animation(history, x, coords, base_pts, n_frames=50, seconds_per_frame=0.5):
+def create_animation(history, final_pts, x, coords, base_pts,
+                     n_frames=20, seconds_per_frame=1.0):
+
     indices = np.linspace(0, len(history)-1, n_frames, dtype=int)
 
     frames = []
 
+    # ---- intermediate frames ----
     for idx in indices:
         pts = history[idx]
         snapped_pts = snap_to_grid(pts, x, coords)
 
         fig = plot_map(base_pts, snapped_pts)
 
-        img_bytes = fig.to_image(format="png", scale=1)
-        img = imageio.imread(img_bytes)
+        img = imageio.imread(fig.to_image(format="png", scale=1))
 
-        # 🔥 remove alpha if present
         if img.shape[-1] == 4:
             img = img[:, :, :3]
 
-        # 🔥 downscale
-        # img = img[::2, ::2]
+        img = img[::1, ::1]   # keep full res OR change to ::2 if needed
 
-        # 🔥 FIX: ensure EVEN dimensions (CRITICAL)
+        # ensure even dims
         h, w = img.shape[:2]
         img = img[:h - (h % 2), :w - (w % 2)]
 
         frames.append(img.astype(np.uint8))
 
-    # 🔥 FIX: use integer FPS
-    fps = 2  # stable
+    # ---- FINAL BEST FRAME ----
+    final_snapped = snap_to_grid(final_pts, x, coords)
+    fig_final = plot_map(base_pts, final_snapped)
+    img_final = imageio.imread(fig_final.to_image(format="png", scale=1))
 
-    # 🔥 repeat frames to simulate 1.5 sec per frame
-    repeat_factor = int(seconds_per_frame * fps)  # = 3
+    if img_final.shape[-1] == 4:
+        img_final = img_final[:, :, :3]
+
+    h, w = img_final.shape[:2]
+    img_final = img_final[:h - (h % 2), :w - (w % 2)]
+
+    # hold final frame longer
+    frames.append(img_final.astype(np.uint8))
+
+    # ---- timing ----
+    fps = 2
+    repeat_factor = int(seconds_per_frame * fps)
 
     frames_extended = []
     for f in frames:
@@ -342,7 +357,7 @@ def create_animation(history, x, coords, base_pts, n_frames=50, seconds_per_fram
         frames_extended,
         fps=fps,
         codec="libx264",
-        quality=5
+        output_params=["-crf", "28"]  # 18=high quality, 28=smaller
     )
 
     return tmp_file.name
@@ -418,6 +433,9 @@ def run_optimization(x, y, mask, model, n_new, n_iters=200, method="Gumbel"):
 
         history = []
 
+        best_loss = float("inf")
+        best_x = None
+
         for it in range(n_iters):
             tau = max(5 - (5 - 0.01) * it / n_iters, 0.01)
 
@@ -447,11 +465,16 @@ def run_optimization(x, y, mask, model, n_new, n_iters=200, method="Gumbel"):
 
             loss = torch.cat(std_list, dim=1).mean()
 
+            # 🔥 TRACK BEST SOLUTION
+            if loss.item() < best_loss:
+                best_loss = loss.item()
+                best_x = x_best.detach().cpu().numpy()
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        return history, x_best.detach().cpu().numpy()
+        return history, best_x
 
     # ============================
     # 🔴 MAXVAR METHOD (NEW)
@@ -642,24 +665,39 @@ def render_tab1():
 
         with st.spinner("Rendering video..."):
             video_path = create_animation(
-                history,
-                x,
-                coords,
-                base_pts,
-                n_frames=20,
-                seconds_per_frame=1.5
-            )
+                            history,
+                            final_pts,  
+                            x,
+                            coords,
+                            base_pts,
+                            n_frames=20,
+                            seconds_per_frame=1.0
+                        )
 
         st.video(video_path)
         
-        # Final RMSE
-        st.subheader("Evaluation")
         with open("data/scale_dict.json") as f:
             scales = json.load(f)
-        before_rmse = calculate_rmse(x, y, mask, teacher, base_pts, scales)
-        st.metric("RMSE (Existing Sensors)", f"{before_rmse:.4f}")
-        rmse = calculate_rmse(x, y, mask, teacher, final_pts, scales)
-        st.metric("Final RMSE", f"{rmse:.4f}")
+        rmse_before = calculate_rmse(x, y, mask, teacher, [], scales)
+        rmse_after = calculate_rmse(x, y, mask, teacher, final_pts, scales)
+        
+        # Final RMSE
+        st.subheader(" Evaluation")
+
+        col1, col2 = st.columns(2)
+
+        col1.metric(
+            "RMSE (Before)",
+            f"{rmse_before:.3f} μg/m³"
+        )
+
+        col2.metric(
+            "RMSE (After)",
+            f"{rmse_after:.3f} μg/m³",
+            delta=f"{rmse_before - rmse_after:.3f}",
+            delta_color="inverse"
+        )
+    
 
         # Download CSV / KML
         st.divider()
