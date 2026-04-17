@@ -1,4 +1,48 @@
 { "gdmi" : {
+  "10": {
+    "n": 10,
+    "rmse_before": 7.894079208374023,
+    "rmse_after": 7.156248569488525,
+    "rmse_improvement": 0.737830638885498,
+    "improvement_percent": 9.346633336321341,
+    "best_file": "/home/neerja.kasture/workspace/Sustainability project course/aqs_v2/results/tnpd/default/gd/10/47/75.json",
+    "best_loss": 0.21304303407669067,
+    "n_files_found": 100,
+    "scales": {
+      "lon": {
+        "min": 67.05000305175781,
+        "max": 98.94999694824219
+      },
+      "lat": {
+        "min": 5.050000190734863,
+        "max": 38.95000076293945
+      },
+      "landscan": {
+        "mean": 18033.312959558825,
+        "std": 78144.63558522168,
+        "max": 6367924.0,
+        "min": 0.0
+      },
+      "poverty": {
+        "mean": 0.06251312223403889,
+        "std": 0.05105808455655873,
+        "max": 0.285,
+        "min": 0.0
+      },
+      "pop_poverty": {
+        "mean": 0.0004973262123493448,
+        "std": 0.0010172220488555645,
+        "max": 0.027280433623265602,
+        "min": 0.0
+      },
+      "PM25": {
+        "mean": 3.4128104471066085,
+        "std": 0.6395298532394896,
+        "preprocess": "log"
+      }
+    },
+    "pred_rmse": 8.466742133257291
+  },
   "20": {
     "n": 20,
     "rmse_before": 7.894079208374023,

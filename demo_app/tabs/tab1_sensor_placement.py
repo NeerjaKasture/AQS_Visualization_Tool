@@ -270,6 +270,7 @@ import yaml
 import os
 import imageio.v2 as imageio
 import tempfile
+import pandas as pd
 from pathlib import Path
 import plotly.graph_objects as go
 from einops import repeat
@@ -279,7 +280,7 @@ from importlib.machinery import SourceFileLoader
 # CONFIG
 # -----------------------------
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE =  "cuda" if torch.cuda.is_available() else "cpu"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def snap_to_grid(x_norm, x_all_norm, coords):
@@ -296,6 +297,7 @@ def snap_to_grid(x_norm, x_all_norm, coords):
 import imageio.v2 as imageio
 import tempfile
 
+@st.cache_data(show_spinner=False)
 def create_animation(history, x, coords, base_pts, n_frames=50, seconds_per_frame=0.5):
     indices = np.linspace(0, len(history)-1, n_frames, dtype=int)
 
@@ -512,7 +514,8 @@ def run_optimization(x, y, mask, model, n_new, n_iters=200, method="Gumbel"):
 # -----------------------------
 # RMSE (TEACHER)
 # -----------------------------
-def calculate_rmse(x, y, mask, teacher, x_new, scales):
+@st.cache_data(show_spinner=False)
+def calculate_rmse(x, y, mask, _teacher, x_new, scales):
     x_cuda = torch.tensor(x, dtype=torch.float32).to(DEVICE)
     y_cuda = torch.tensor(y, dtype=torch.float32).to(DEVICE)[..., None]
 
@@ -533,7 +536,7 @@ def calculate_rmse(x, y, mask, teacher, x_new, scales):
         for i in range(0, x.shape[0], 1024):
             xt = x_cuda[i:i+1024]
             xt = repeat(xt, 'b d -> t b d', t=y.shape[0])
-            pred, _ = teacher.predict(x_context, y_context, xt)
+            pred, _ = _teacher.predict(x_context, y_context, xt)
             preds.append(pred)
 
     preds = torch.cat(preds, dim=1)
@@ -606,7 +609,7 @@ def plot_map(base_pts, new_pts):
 # MAIN TAB
 # -----------------------------
 def render_tab1():
-    st.title("🌍 Live Sensor Placement (Distilled Model)")
+    st.title("Live Sensor Placement Optimization")
 
     x, y, mask, model, teacher, coords = load_data_and_models()
 
@@ -618,14 +621,22 @@ def render_tab1():
     with col2:
         method = st.selectbox("Method", ["Gumbel", "MaxVar"])
 
-    if st.button("🚀 Run Optimization"):
-        with st.spinner("Running model..."):
-            history, final_pts = run_optimization(x, y, mask, model, n_new, method=method)
+    if st.button("Run Optimization"):
+        # Use session state to cache optimization results
+        cache_key = f"optim_{n_new}_{method}"
+        
+        if cache_key not in st.session_state:
+            with st.spinner("Running optimization..."):
+                history, final_pts = run_optimization(x, y, mask, model, n_new, method=method)
+            st.session_state[cache_key] = (history, final_pts)
+        else:
+            st.info("Running optimization...(using cache) ")
+            history, final_pts = st.session_state[cache_key]
 
         st.success("Optimization complete!")
 
         # Animation
-        st.subheader("🎬 Sensor Evolution")
+        st.subheader("Sensor Evolution")
 
         base_pts = coords[mask]
 
@@ -642,11 +653,36 @@ def render_tab1():
         st.video(video_path)
         
         # Final RMSE
-        st.subheader("📊 Evaluation")
+        st.subheader("Evaluation")
         with open("data/scale_dict.json") as f:
             scales = json.load(f)
+        before_rmse = calculate_rmse(x, y, mask, teacher, base_pts, scales)
+        st.metric("RMSE (Existing Sensors)", f"{before_rmse:.4f}")
         rmse = calculate_rmse(x, y, mask, teacher, final_pts, scales)
         st.metric("Final RMSE", f"{rmse:.4f}")
+
+        # Download CSV / KML
+        st.divider()
+        st.subheader("Download optimum sensor locations")
+        final_coords = snap_to_grid(final_pts, x, coords)
+        df_preview = pd.DataFrame(final_coords, columns=['latitude', 'longitude'])
+        
+        st.dataframe(df_preview.head(50), use_container_width=True, height=300)
+
+        from utils.kml_exporter import dataframe_to_kml
+
+        # Generate KML string
+        kml_string = dataframe_to_kml(df_preview, lon_col="longitude", lat_col="latitude")
+
+        # KML download button
+        kml_filename = f"best_sensors_var_{n_new}.kml" if method == "MaxVar" else f"best_sensors_{n_new}.kml"
+        st.download_button(
+            label="Download KML (Google Earth)",
+            data=kml_string.encode("utf-8"),
+            file_name=kml_filename,
+            mime="application/vnd.google-earth.kml+xml",
+            key=f"download_best_sensors_kml_{n_new}_{method}"
+        )
 
 
 if __name__ == "__main__":

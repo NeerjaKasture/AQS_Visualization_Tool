@@ -14,4 +14,10 @@ Pillow>=9.0.0      # Uncomment if using animation export features
 
 simplekml
 
-
+pyyaml
+imageio[ffmpeg]
+einops
+netcdf4
+tqdm
+python-box
+kaleido
